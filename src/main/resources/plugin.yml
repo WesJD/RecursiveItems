@@ -1,0 +1,12 @@
+name: RecursiveItems
+version: ${project.version}
+main: net.wesjd.recursiveitems.Main
+depend: [Vault]
+authors: [WesJD]
+commands:
+  sell:
+    description: Opens sell items GUI
+  setworth:
+
+  worth:
+

@@ -1,0 +1,6 @@
+use-sell-gui: true
+cache:
+  max-size: 200
+  expire-time-seconds: 30
+defined:
+  STICK: 90
