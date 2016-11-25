@@ -1,6 +1,6 @@
 name: RecursiveItems
 version: ${project.version}
-main: net.wesjd.recursiveitems.Main
+main: net.wesjd.recursiveitems.RecursiveItems
 depend: [Vault]
 authors: [WesJD]
 commands:
@@ -9,4 +9,6 @@ commands:
   setworth:
 
   worth:
+
+  removeworth:
 

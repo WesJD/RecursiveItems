@@ -1,6 +1,6 @@
 package net.wesjd.recursiveitems.command;
 
-import net.wesjd.recursiveitems.Main;
+import net.wesjd.recursiveitems.RecursiveItems;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -9,6 +9,7 @@ import org.bukkit.entity.Player;
 
 /**
  * An AbstractCommand for abstract people
+ *
  * @author Wesley Smith
  */
 public abstract class AbstractCommand implements CommandExecutor {
@@ -16,20 +17,22 @@ public abstract class AbstractCommand implements CommandExecutor {
     /**
      * Our local main class instance, accessible by implemented classes
      */
-    protected final Main main;
+    protected final RecursiveItems plugin;
 
     /**
      * Creates an {@link AbstractCommand}
-     * @param main The main class
+     *
+     * @param plugin The main class
      */
-    public AbstractCommand(Main main) {
-        this.main = main;
+    public AbstractCommand(RecursiveItems plugin) {
+        this.plugin = plugin;
     }
 
     /**
      * Called when the set command is executed
+     *
      * @param player The player who ran the command
-     * @param args The command arguments
+     * @param args   The command arguments
      * @throws Exception to handle exceptions
      */
     public abstract void onCmd(Player player, String[] args) throws Exception;
@@ -39,7 +42,7 @@ public abstract class AbstractCommand implements CommandExecutor {
      */
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if(sender instanceof Player) {
+        if (sender instanceof Player) {
             final Player player = (Player) sender;
             try {
                 onCmd(player, args);
@@ -48,7 +51,7 @@ public abstract class AbstractCommand implements CommandExecutor {
                 player.sendMessage(ChatColor.RED + ex.getClass().getSimpleName() + ": " + ex.getMessage());
             }
         } else sender.sendMessage(ChatColor.RED + "Only players can execute this command!");
-        return false;
+        return true;
     }
 
 }
