@@ -1,6 +1,7 @@
 package net.wesjd.recursiveitems;
 
 import net.milkbowl.vault.economy.Economy;
+import net.wesjd.recursiveitems.command.RemoveWorthCommand;
 import net.wesjd.recursiveitems.command.SellCommand;
 import net.wesjd.recursiveitems.command.SetWorthCommand;
 import net.wesjd.recursiveitems.command.WorthCommand;
@@ -12,12 +13,13 @@ import java.util.logging.Level;
 
 /**
  * The main class
+ *
  * @author Wesley Smith, MilkBowl
  */
-public class Main extends JavaPlugin {
+public class RecursiveItems extends JavaPlugin {
 
     /**
-     * Vault Economy instance, provided in {@link Main#setupEconomy()}
+     * Vault Economy instance, provided in {@link RecursiveItems#setupEconomy()}
      */
     private Economy economy;
     /**
@@ -30,11 +32,12 @@ public class Main extends JavaPlugin {
      */
     @Override
     public void onEnable() {
-        if(setupEconomy()) {
+        if (setupEconomy()) {
             engine = new ItemEngine(this);
             getCommand("sell").setExecutor(new SellCommand(this));
             getCommand("setworth").setExecutor(new SetWorthCommand(this));
             getCommand("worth").setExecutor(new WorthCommand(this));
+            getCommand("removeworth").setExecutor(new RemoveWorthCommand(this));
         } else {
             getLogger().log(Level.SEVERE, "Unable to hook Vault economy, disabling plugin.");
             getPluginLoader().disablePlugin(Bukkit.getPluginManager().getPlugin("RecursiveItems"));
@@ -46,21 +49,23 @@ public class Main extends JavaPlugin {
      */
     @Override
     public void onDisable() {
-        engine.cleanup();
+        if (engine != null) engine.cleanup();
     }
 
     /**
      * Hook into Vault economy
+     *
      * @return Weather the hook was successful
      */
     private boolean setupEconomy() {
         RegisteredServiceProvider<Economy> economyProvider = getServer().getServicesManager().getRegistration(Economy.class);
-        if(economyProvider != null) economy = economyProvider.getProvider();
+        if (economyProvider != null) economy = economyProvider.getProvider();
         return (economy != null);
     }
 
     /**
      * Get the Economy instace
+     *
      * @return The instance
      */
     public Economy getEconomy() {
@@ -69,6 +74,7 @@ public class Main extends JavaPlugin {
 
     /**
      * Get the ItemEngine instance
+     *
      * @return The instance
      */
     public ItemEngine getEngine() {

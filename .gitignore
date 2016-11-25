@@ -2,3 +2,4 @@
 RecursiveItems.iml
 dependency-reduced-pom.xml
 /src/test
+target/

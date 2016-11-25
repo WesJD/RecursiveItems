@@ -17,6 +17,7 @@ import java.util.function.Function;
 
 /**
  * The Item Engine, where almost everything is handled
+ *
  * @author Wesley Smith
  */
 public class ItemEngine {
@@ -24,7 +25,7 @@ public class ItemEngine {
     /**
      * The main class, passed in the constructor
      */
-    private final Main main;
+    private final RecursiveItems main;
     /**
      * The {@link ItemStack} to worth cache, cleared on config reload
      */
@@ -32,9 +33,10 @@ public class ItemEngine {
 
     /**
      * Creates a new {@link ItemEngine}, only accessible from the main class
-     * @param main The {@link Main} class
+     *
+     * @param main The {@link RecursiveItems} class
      */
-    ItemEngine(Main main) {
+    ItemEngine(RecursiveItems main) {
         this.main = main;
         this.itemWorth = CacheBuilder.newBuilder()
                 .expireAfterAccess(main.getConfig().getLong("cache.expire-time-seconds"), TimeUnit.SECONDS)
@@ -44,6 +46,7 @@ public class ItemEngine {
 
     /**
      * Recursively searches for the worth of this {@link ItemStack} based on it's ingredients
+     *
      * @param stack The {@link ItemStack} to find the worth of
      * @return The item's worth
      * @throws ExecutionException if any base items involved in the crafting of this item do not have a defined price
@@ -55,11 +58,24 @@ public class ItemEngine {
 
     /**
      * Set the worth of an {@link ItemStack}({@link Material} and data value)
+     *
      * @param stack The {@link ItemStack} to set the worth of
      * @param value The worth of the item
      */
     public void setWorth(ItemStack stack, double value) {
         main.getConfig().set("defined." + stack.getType(), value);
+    }
+
+    /**
+     * Removes the worth of an {@link ItemStack}({@link Material} and data value)
+     *
+     * @param stack The {@link ItemStack} to remove the worth of
+     * @throws Exception if the {@link ItemStack} involved doesn't have a worth
+     */
+    public void removeWorth(ItemStack stack) throws Exception {
+        if (main.getConfig().contains("defined." + stack.getType()))
+            main.getConfig().set("defined." + stack.getType(), null);
+        else throw new Exception("No explicit worth set for ItemStack");
     }
 
     /**
@@ -80,6 +96,7 @@ public class ItemEngine {
 
     /**
      * A {@link CacheLoader} for the worth of an {@link ItemStack}
+     *
      * @author Wesley Smith
      */
     private class WorthCacheLoader extends CacheLoader<ItemStack, Double> {
@@ -88,7 +105,8 @@ public class ItemEngine {
          * Returns an {@link OptionalDouble} of the config's set worth value
          */
         private final Function<ItemStack, OptionalDouble> configWorth = (stack) -> {
-            if(main.getConfig().contains("defined." + stack.getType())) return OptionalDouble.of(main.getConfig().getDouble("defined." + stack.getType()));
+            if (main.getConfig().contains("defined." + stack.getType()))
+                return OptionalDouble.of(main.getConfig().getDouble("defined." + stack.getType()));
             return OptionalDouble.empty();
         };
 
@@ -97,16 +115,20 @@ public class ItemEngine {
          */
         @Override
         public Double load(ItemStack key) throws Exception {
+
+            OptionalDouble setPrice = configWorth.apply(key); //check for a defined worth
+            if (setPrice.isPresent()) return setPrice.getAsDouble();
+
             final Optional<Recipe> possibleRecipe = Bukkit.getRecipesFor(key).stream()
                     .filter(recipe -> recipe instanceof ShapelessRecipe || recipe instanceof ShapedRecipe)
                     .sorted((recipe1, recipe2) -> -Integer.compare(recipe1.getResult().getAmount(), recipe2.getResult().getAmount()))
                     .findFirst();
-            if(possibleRecipe.isPresent()) {
+            if (possibleRecipe.isPresent()) { //
                 final Recipe recipe = possibleRecipe.get();
 
                 Collection<ItemStack> items = Collections.emptyList();
-                if(recipe instanceof ShapedRecipe) items = ((ShapedRecipe) recipe).getIngredientMap().values();
-                else if(recipe instanceof ShapelessRecipe) items = ((ShapelessRecipe) recipe).getIngredientList();
+                if (recipe instanceof ShapedRecipe) items = ((ShapedRecipe) recipe).getIngredientMap().values();
+                else if (recipe instanceof ShapelessRecipe) items = ((ShapelessRecipe) recipe).getIngredientList();
 
                 final Exception[] toThrow = new Exception[1];
                 final double worth = items.stream()
@@ -119,13 +141,9 @@ public class ItemEngine {
                             }
                         }))
                         .sum();
-                if(toThrow[0] != null) throw toThrow[0];
+                if (toThrow[0] != null) throw toThrow[0];
                 return worth / recipe.getResult().getAmount();
-            } else {
-                final OptionalDouble possibleWorth = configWorth.apply(key);
-                if(possibleWorth.isPresent()) return possibleWorth.getAsDouble();
-                else throw new Exception("Item does not have a recipe or defined worth.");
-            }
+            } else throw new Exception("Item does not have a recipe or defined worth.");
         }
 
     }

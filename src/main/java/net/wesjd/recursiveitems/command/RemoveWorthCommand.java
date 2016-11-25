@@ -6,23 +6,12 @@ import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-/**
- * /worth command, finds the worth of your hand or the stack supplied
- *
- * @author Wesley Smith
- */
-public class WorthCommand extends AbstractCommand {
+public class RemoveWorthCommand extends AbstractCommand {
 
-    /**
-     * @inheritDoc
-     */
-    public WorthCommand(RecursiveItems main) {
-        super(main);
+    public RemoveWorthCommand(RecursiveItems plugin) {
+        super(plugin);
     }
 
-    /**
-     * @inheritDoc
-     */
     @Override
     public void onCmd(Player player, String[] args) throws Exception {
         ItemStack toWorth;
@@ -30,7 +19,7 @@ public class WorthCommand extends AbstractCommand {
             final ItemStack hand = player.getItemInHand();
             if (hand != null) toWorth = hand;
             else {
-                player.sendMessage(ChatColor.RED + "Usage: /worth <material[:dataValue]>");
+                player.sendMessage(ChatColor.RED + "Usage: /removeworth [material[:dataValue]]");
                 return;
             }
         } else if (args.length < 2) {
@@ -39,8 +28,8 @@ public class WorthCommand extends AbstractCommand {
             player.sendMessage(ChatColor.RED + "Too many arguments.");
             return;
         }
-        player.sendMessage(ChatColor.GREEN + "A " + toWorth.getType() + (toWorth.getDurability() > 0 ? ":" + toWorth.getDurability() : "") +
-                " is worth " + super.plugin.getEconomy().format(super.plugin.getEngine().getWorth(toWorth)) + ".");
-    }
 
+        super.plugin.getEngine().removeWorth(toWorth);
+        player.sendMessage(ChatColor.GREEN.toString() + toWorth.getType() + (toWorth.getDurability() > 0 ? ":" + toWorth.getDurability() : "") + "'s worth has been removed.");
+    }
 }
