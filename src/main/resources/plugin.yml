@@ -2,13 +2,21 @@ name: RecursiveItems
 version: ${project.version}
 main: net.wesjd.recursiveitems.RecursiveItems
 depend: [Vault]
-authors: [WesJD]
+authors: [WesJD, TheMrGong ]
 commands:
   sell:
+    command: /<command>
     description: Opens sell items GUI
   setworth:
-
+    command: /<command> [material[:dataValue]]
+    description: Set the worth of your hand or the stack supplied
   worth:
-
+    command: /<command> [material[:dataValue]]
+    description: Find the worth of your hand or the stack supplied
   removeworth:
+    command: /<command> [material[:dataValue]]
+    description: Remove the worth of your hand or the stack supplied
+  reload:
+    command: /<command>
+    description: Reload the config and cache
 

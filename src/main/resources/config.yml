@@ -3,4 +3,5 @@ cache:
   max-size: 200
   expire-time-seconds: 30
 defined:
-  STICK: 90
+  STICK:
+    0: 30

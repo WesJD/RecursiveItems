@@ -6,12 +6,23 @@ import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+/**
+ * /setworth command, sets the worth of your hand or the stack supplied
+ *
+ * @author Daniel Gongora
+ */
 public class SetWorthCommand extends AbstractCommand {
 
+    /**
+     * @inheritDoc
+     */
     public SetWorthCommand(RecursiveItems main) {
-        super(main);
+        super(main, "recursiveitems.setworth");
     }
 
+    /**
+     * @inheritDoc
+     */
     @Override
     public void onCmd(Player player, String[] args) throws Exception {
         ItemStack toWorth;
@@ -32,7 +43,7 @@ public class SetWorthCommand extends AbstractCommand {
             return;
         }
 
-        super.plugin.getEngine().setWorth(toWorth, worth);
+        super.main.getEngine().setWorth(toWorth, worth);
         player.sendMessage(ChatColor.GREEN.toString() + toWorth.getType() + (toWorth.getDurability() > 0 ? ":" + toWorth.getDurability() : "") +
                 "'s worth  has been set to $" + worth + ".");
 

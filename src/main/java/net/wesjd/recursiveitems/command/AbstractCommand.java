@@ -17,15 +17,21 @@ public abstract class AbstractCommand implements CommandExecutor {
     /**
      * Our local main class instance, accessible by implemented classes
      */
-    protected final RecursiveItems plugin;
+    protected final RecursiveItems main;
+    /**
+     * The permission for this command
+     */
+    private final String permission;
 
     /**
      * Creates an {@link AbstractCommand}
      *
-     * @param plugin The main class
+     * @param main The main class
+     * @param permission The permission for this command
      */
-    public AbstractCommand(RecursiveItems plugin) {
-        this.plugin = plugin;
+    public AbstractCommand(RecursiveItems main, String permission) {
+        this.main = main;
+        this.permission = permission;
     }
 
     /**
@@ -44,12 +50,13 @@ public abstract class AbstractCommand implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (sender instanceof Player) {
             final Player player = (Player) sender;
-            try {
-                onCmd(player, args);
-                return true;
-            } catch (Exception ex) {
-                player.sendMessage(ChatColor.RED + ex.getClass().getSimpleName() + ": " + ex.getMessage());
-            }
+            if(permission == null || player.hasPermission(permission)) {
+                try {
+                    onCmd(player, args);
+                } catch (Exception ex) {
+                    player.sendMessage(ChatColor.RED + ex.getClass().getSimpleName() + ": " + ex.getMessage() + ".");
+                }
+            } else player.sendMessage(ChatColor.RED + "You need the permission " + permission + " to execute this command!");
         } else sender.sendMessage(ChatColor.RED + "Only players can execute this command!");
         return true;
     }

@@ -17,7 +17,7 @@ public class WorthCommand extends AbstractCommand {
      * @inheritDoc
      */
     public WorthCommand(RecursiveItems main) {
-        super(main);
+        super(main, "recursiveitems.worth");
     }
 
     /**
@@ -30,7 +30,7 @@ public class WorthCommand extends AbstractCommand {
             final ItemStack hand = player.getItemInHand();
             if (hand != null) toWorth = hand;
             else {
-                player.sendMessage(ChatColor.RED + "Usage: /worth <material[:dataValue]>");
+                player.sendMessage(ChatColor.RED + "Usage: /worth [material[:dataValue]]");
                 return;
             }
         } else if (args.length < 2) {
@@ -40,7 +40,7 @@ public class WorthCommand extends AbstractCommand {
             return;
         }
         player.sendMessage(ChatColor.GREEN + "A " + toWorth.getType() + (toWorth.getDurability() > 0 ? ":" + toWorth.getDurability() : "") +
-                " is worth " + super.plugin.getEconomy().format(super.plugin.getEngine().getWorth(toWorth)) + ".");
+                " is worth " + super.main.getEconomy().format(super.main.getEngine().getWorth(toWorth)) + ".");
     }
 
 }

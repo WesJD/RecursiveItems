@@ -6,12 +6,23 @@ import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+/**
+ * /removeworth command, removes the worth of an ItemStack
+ *
+ * @author Daniel Gongora
+ */
 public class RemoveWorthCommand extends AbstractCommand {
 
+    /**
+     * @inheritDoc
+     */
     public RemoveWorthCommand(RecursiveItems plugin) {
-        super(plugin);
+        super(plugin, "recursiveitems.removeworth");
     }
 
+    /**
+     * @inheritDoc
+     */
     @Override
     public void onCmd(Player player, String[] args) throws Exception {
         ItemStack toWorth;
@@ -19,7 +30,7 @@ public class RemoveWorthCommand extends AbstractCommand {
             final ItemStack hand = player.getItemInHand();
             if (hand != null) toWorth = hand;
             else {
-                player.sendMessage(ChatColor.RED + "Usage: /removeworth [material[:dataValue]]");
+                player.sendMessage(ChatColor.RED + "Usage: /removeworth <material[:dataValue]>");
                 return;
             }
         } else if (args.length < 2) {
@@ -29,7 +40,8 @@ public class RemoveWorthCommand extends AbstractCommand {
             return;
         }
 
-        super.plugin.getEngine().removeWorth(toWorth);
+        super.main.getEngine().removeWorth(toWorth);
         player.sendMessage(ChatColor.GREEN.toString() + toWorth.getType() + (toWorth.getDurability() > 0 ? ":" + toWorth.getDurability() : "") + "'s worth has been removed.");
     }
+
 }

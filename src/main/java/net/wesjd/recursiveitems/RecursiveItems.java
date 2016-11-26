@@ -1,10 +1,7 @@
 package net.wesjd.recursiveitems;
 
 import net.milkbowl.vault.economy.Economy;
-import net.wesjd.recursiveitems.command.RemoveWorthCommand;
-import net.wesjd.recursiveitems.command.SellCommand;
-import net.wesjd.recursiveitems.command.SetWorthCommand;
-import net.wesjd.recursiveitems.command.WorthCommand;
+import net.wesjd.recursiveitems.command.*;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -38,6 +35,7 @@ public class RecursiveItems extends JavaPlugin {
             getCommand("setworth").setExecutor(new SetWorthCommand(this));
             getCommand("worth").setExecutor(new WorthCommand(this));
             getCommand("removeworth").setExecutor(new RemoveWorthCommand(this));
+            getCommand("reload").setExecutor(new ReloadCommand(this));
         } else {
             getLogger().log(Level.SEVERE, "Unable to hook Vault economy, disabling plugin.");
             getPluginLoader().disablePlugin(Bukkit.getPluginManager().getPlugin("RecursiveItems"));

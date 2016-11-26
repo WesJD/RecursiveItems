@@ -29,7 +29,7 @@ public class ItemEngine {
     /**
      * The {@link ItemStack} to worth cache, cleared on config reload
      */
-    private final LoadingCache<ItemStack, Double> itemWorth;
+    private LoadingCache<ItemStack, Double> itemWorth;
 
     /**
      * Creates a new {@link ItemEngine}, only accessible from the main class
@@ -38,7 +38,11 @@ public class ItemEngine {
      */
     ItemEngine(RecursiveItems main) {
         this.main = main;
-        this.itemWorth = CacheBuilder.newBuilder()
+        initializeCache();
+    }
+
+    private void initializeCache() {
+        itemWorth = CacheBuilder.newBuilder()
                 .expireAfterAccess(main.getConfig().getLong("cache.expire-time-seconds"), TimeUnit.SECONDS)
                 .maximumSize(main.getConfig().getInt("cache.max-size"))
                 .build(new WorthCacheLoader());
@@ -63,7 +67,7 @@ public class ItemEngine {
      * @param value The worth of the item
      */
     public void setWorth(ItemStack stack, double value) {
-        main.getConfig().set("defined." + stack.getType(), value);
+        main.getConfig().set("defined." + stack.getType() + "." + stack.getDurability(), value);
     }
 
     /**
@@ -83,7 +87,7 @@ public class ItemEngine {
      */
     public void reload() {
         main.reloadConfig();
-        itemWorth.invalidateAll();
+        initializeCache();
     }
 
     /**
@@ -105,8 +109,8 @@ public class ItemEngine {
          * Returns an {@link OptionalDouble} of the config's set worth value
          */
         private final Function<ItemStack, OptionalDouble> configWorth = (stack) -> {
-            if (main.getConfig().contains("defined." + stack.getType()))
-                return OptionalDouble.of(main.getConfig().getDouble("defined." + stack.getType()));
+            if (main.getConfig().contains("defined." + stack.getType() + "." + stack.getDurability()))
+                return OptionalDouble.of(main.getConfig().getDouble("defined." + stack.getType() + "." + stack.getDurability()));
             return OptionalDouble.empty();
         };
 
@@ -115,9 +119,8 @@ public class ItemEngine {
          */
         @Override
         public Double load(ItemStack key) throws Exception {
-
-            OptionalDouble setPrice = configWorth.apply(key); //check for a defined worth
-            if (setPrice.isPresent()) return setPrice.getAsDouble();
+            final OptionalDouble possibleWorth = configWorth.apply(key); //check for a defined worth
+            if (possibleWorth.isPresent()) return possibleWorth.getAsDouble();
 
             final Optional<Recipe> possibleRecipe = Bukkit.getRecipesFor(key).stream()
                     .filter(recipe -> recipe instanceof ShapelessRecipe || recipe instanceof ShapedRecipe)
