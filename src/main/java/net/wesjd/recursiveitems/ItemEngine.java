@@ -61,6 +61,22 @@ public class ItemEngine {
     }
 
     /**
+     * Recursively searches for the worth of this {@link ItemStack[]} based on it's ingredients
+     *
+     * @param stacks The {@link ItemStack[]} to find the worth of
+     * @return The item's worth or 0 if none of the items have a defined price
+     */
+    public double getWorth(ItemStack... stacks) {
+        return Arrays.stream(stacks).filter(Objects::nonNull).mapToDouble(s -> {
+            try {
+                return getWorth(s);
+            } catch (ExecutionException e) {
+                return 0; //no defined price
+            }
+        }).sum();
+    }
+
+    /**
      * Set the worth of an {@link ItemStack}({@link Material} and data value)
      *
      * @param stack The {@link ItemStack} to set the worth of

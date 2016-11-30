@@ -26,7 +26,7 @@ public abstract class AbstractCommand implements CommandExecutor {
     /**
      * Creates an {@link AbstractCommand}
      *
-     * @param main The main class
+     * @param main       The main class
      * @param permission The permission for this command
      */
     public AbstractCommand(RecursiveItems main, String permission) {
@@ -50,7 +50,7 @@ public abstract class AbstractCommand implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (sender instanceof Player) {
             final Player player = (Player) sender;
-            if(permission == null || player.hasPermission(permission)) {
+            if (permission == null || player.hasPermission(permission)) {
                 try {
                     onCmd(player, args);
                 } catch (Exception ex) {
