@@ -68,9 +68,13 @@ public class ItemEngine {
      */
     public double getWorth(ItemStack... stacks) {
         return Arrays.stream(stacks).filter(Objects::nonNull).mapToDouble(s -> {
+
             try {
-                return getWorth(s);
+                double w = getWorth(s);
+                System.out.println("FOUND WORTH: "+w);
+                return w;
             } catch (ExecutionException e) {
+                System.out.println("NO PRICE DEFINED");
                 return 0; //no defined price
             }
         }).sum();

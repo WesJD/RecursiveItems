@@ -18,10 +18,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.Arrays;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Inventory to allow players to easily sell a large quantity of items
@@ -87,7 +84,8 @@ public class SellingInventory implements Listener {
         this.stored = new ItemStack[INVENTORY_SIZE - 9];
         this.player = player.getUniqueId();
 
-        initializeTopRow();
+        register();
+        initializeInventory();
 
         player.openInventory(inventory);
     }
@@ -133,8 +131,10 @@ public class SellingInventory implements Listener {
     /**
      * Initializes top row which is never modified after
      * initialization. Contains useful buttons for the player
+     * <br />
+     * Also places an 'empty inventory' button
      */
-    private void initializeTopRow() {
+    private void initializeInventory() {
         for (int i = 0; i < 9; i++) {
             switch (i) {
                 case SELL_AGREE_INDEX:
@@ -151,6 +151,7 @@ public class SellingInventory implements Listener {
                     break;
             }
         }
+        inventory.setItem(NO_ITEMS_INDEX, NO_ITEMS_YET);
     }
 
     /**
@@ -160,7 +161,10 @@ public class SellingInventory implements Listener {
      * Called whenever inventory initialized or inventory re-rendered
      */
     private void updateSellIcon() {
-        inventory.setItem(SELL_DISPLAY_INDEX, generateSellIcon());
+        ItemStack w = generateSellIcon();
+        inventory.setItem(SELL_DISPLAY_INDEX, w);
+        System
+                
     }
 
     /**
@@ -171,7 +175,9 @@ public class SellingInventory implements Listener {
      * @return {@link ItemStack} generated
      */
     private ItemStack generateSellIcon() {
-        return new ItemBuilder(Material.PAPER).name(String.format(SELL_DISPLAY_FORMAT, main.getEngine().getWorth(stored))).build();
+        double worth = main.getEngine().getWorth(stored);
+        System.out.println("GOT WORTH: "+worth);
+        return new ItemBuilder(Material.PAPER).name(String.format(SELL_DISPLAY_FORMAT, worth)).build();
     }
 
     /**
@@ -183,10 +189,11 @@ public class SellingInventory implements Listener {
         resetInventory();
         updateSellIcon(); //update due to possible inventory change
         boolean hasRendered = false;
-        for (int i = 9; i <= INVENTORY_SIZE; i++) {
+        for (int i = 9; i < INVENTORY_SIZE; i++) {
             ItemStack render = stored[i - 9]; //subtract nine since first row is 9, and stored items start at index 0
 
             inventory.setItem(i, render);
+
             if (render != null) hasRendered = true;
         }
         if (!hasRendered) inventory.setItem(NO_ITEMS_INDEX, NO_ITEMS_YET); //no items are placed in inventory!
@@ -196,7 +203,7 @@ public class SellingInventory implements Listener {
      * Resets the inventory containing the items the player is selling
      */
     private void resetInventory() {
-        for (int i = 9; i <= INVENTORY_SIZE; i++) inventory.setItem(i, null);
+        for (int i = 9; i < INVENTORY_SIZE; i++) inventory.setItem(i, null);
     }
 
     /**
@@ -206,11 +213,12 @@ public class SellingInventory implements Listener {
      * @return {@link Optional<Integer>} of the index found
      */
     private Optional<Integer> getAvailableSlotFor(ItemStack stack) {
-        for (int i = 0; i < stored.length; i++) {
-            ItemStack item = stored[i];
-            if (item == null) return Optional.of(i); //found an available slot
-            else if (item.isSimilar(stack)) return Optional.of(i); //check if the two can be grouped together
-        }
+        if (stack != null && stack.getType() != Material.AIR)
+            for (int i = 0; i < stored.length; i++) {
+                ItemStack item = stored[i];
+                if (item == null || item.getType() == Material.AIR) return Optional.of(i); //found an available slot
+                else if (item.getAmount() < 64 && item.isSimilar(stack)) return Optional.of(i); //check if the two can be grouped together and can be added
+            }
         return Optional.empty(); //no space for item
     }
 
@@ -220,11 +228,21 @@ public class SellingInventory implements Listener {
      * @param input {@link ItemStack} being added
      */
     private void addItem(ItemStack input) {
-        getAvailableSlotFor(input).ifPresent(i -> {
+        Optional<Integer> availableSlotFor = getAvailableSlotFor(input);
+        availableSlotFor.ifPresent(i -> {
             ItemStack at = stored[i];
-            if (at == null) stored[i] = input; //slot was empty, just place it there
-            else at.setAmount(at.getAmount() + input.getAmount()); //already item there, but can be merged
-            displayInventoryItems(); //re-render inventory
+            if (at == null) stored[i] = input.clone(); //slot was empty, just place it there
+            else if (at.getAmount() < 64) { //allow 64 no matter what
+                if (at.getAmount() + input.getAmount() > 64) { //do some overflowing
+                    int leftOver = input.getAmount() - (64 - at.getAmount());
+                    at.setAmount(64);
+
+                    ItemStack inputClone = input.clone();
+                    inputClone.setAmount(leftOver);
+
+                    addItem(inputClone); //recursively add what couldn't be added to the stack to the next slot
+                } else at.setAmount(at.getAmount() + input.getAmount()); //already item there, but can be merged
+            }
         });
     }
 
@@ -237,6 +255,7 @@ public class SellingInventory implements Listener {
         ItemStack addToPlayer = stored[index];
         if (addToPlayer != null) {//if we are actually removing an item
             getPlayer().ifPresent(p -> giveOrDrop(p, addToPlayer)); //give them the item back
+            stored[index] = null; //set item to null
             displayInventoryItems(); //re-render inventory
         }
 
@@ -269,8 +288,53 @@ public class SellingInventory implements Listener {
                 .filter(p -> e.getInventory().equals(inventory) && e.getSlotType() == InventoryType.SlotType.CONTAINER) //and they clicked inside our inventory
                 .ifPresent(p -> { //do
                     e.setCancelled(true); //cancel movement
+                    ItemStack interacting = null;
+                    int interactSlot = -1;
+                    Runnable reset = null;
 
-                    switch (e.getRawSlot()) {
+                    switch (e.getClick()) {
+                        case LEFT:
+                        case RIGHT:
+                            if(e.getRawSlot() < INVENTORY_SIZE) { //clicked an item into selling inventory
+                                interactSlot = e.getRawSlot();
+                                if(e.getCursor() != null && e.getCursor().getType() != Material.AIR) { //adding a new item
+                                    interacting = e.getCursor();
+                                    reset = () -> e.setCursor(new ItemStack(Material.AIR));
+                                }//else removing
+                            } else e.setCancelled(false); //interacting with own inventory
+                            break;
+                        case SHIFT_LEFT:
+                        case SHIFT_RIGHT:
+                            if(e.getRawSlot() > INVENTORY_SIZE) { //shift clicking item from player inventory into our inventory
+                                interacting = e.getCurrentItem();
+                                interactSlot = 999;
+                                reset = () -> Bukkit.getScheduler().runTask(main, () -> //v subtract inventory size to get into player inventory, subtract player inventory size to get into hotbar
+                                        e.getWhoClicked().getInventory().setItem(e.getSlot(), new ItemStack(Material.AIR)));
+                            } else interactSlot = e.getRawSlot();//taking item out
+                            break;
+                        case MIDDLE:
+                        case WINDOW_BORDER_LEFT:
+                        case WINDOW_BORDER_RIGHT:
+                            e.setCancelled(false);
+                            break;
+                        case NUMBER_KEY:
+                            ItemStack moveToOrFrom = e.getCurrentItem();
+                            if(e.getRawSlot() < INVENTORY_SIZE) {
+                                interactSlot = e.getRawSlot();
+                                if ((moveToOrFrom == null || moveToOrFrom.getType() == Material.AIR)) {//putting item from inventory
+                                    interactSlot = e.getRawSlot();
+                                    interacting = e.getWhoClicked().getInventory().getItem(e.getHotbarButton());
+                                    reset = () -> e.getWhoClicked().getInventory().setItem(e.getHotbarButton(), new ItemStack(Material.AIR));
+                                } //else taking an item
+                            } else e.setCancelled(false); //interacting with own inventory
+                            break;
+                        case DROP:
+                        case CONTROL_DROP:
+                            if(e.getRawSlot() >= INVENTORY_SIZE) e.setCancelled(false); //interacting with own inventory
+                            break;
+                    }
+
+                    switch (interactSlot) {
                         case SELL_AGREE_INDEX: //selling the items!
                             handleSell();
                             break;
@@ -279,10 +343,12 @@ public class SellingInventory implements Listener {
                             break;
 
                         default:
-                            if (e.getRawSlot() > 8) { //make sure they aren't clicking space fillers
-                                if (e.getCurrentItem() != null)  //placing an item in
-                                    addItem(e.getCurrentItem());
-                                else removeItem(e.getRawSlot()); //removing an item
+                            if (interactSlot > 8) { //make sure they aren't clicking space fillers
+                                if (interacting != null) { //placing an item in
+                                    reset.run(); //remove item from player inventory
+                                    addItem(interacting);
+                                    displayInventoryItems(); //re-render inventory (manual due to recursion)
+                                } else removeItem(interactSlot - 9); //removing an item
                             }
                             break;
                     }
@@ -292,11 +358,8 @@ public class SellingInventory implements Listener {
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent e) {
         getPlayer().filter(p -> player.equals(e.getWhoClicked().getUniqueId())) //if our opener clicked
-                .filter(p -> e.getInventory().equals(inventory))
-                .ifPresent(p -> { //and they clicked inside our inventory
-                    e.setCancelled(true);
-                    e.getNewItems().values().forEach(this::addItem); //add some items
-                });
+                .filter(p -> e.getInventorySlots().stream().anyMatch(i -> i < INVENTORY_SIZE)) //and they clicked inside our inventory
+                .ifPresent(p -> e.setCancelled(true)); //dont handle dragging, cursor item too glitchy
     }
 
     @EventHandler

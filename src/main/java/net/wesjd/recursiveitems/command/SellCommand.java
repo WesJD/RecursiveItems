@@ -1,6 +1,7 @@
 package net.wesjd.recursiveitems.command;
 
 import net.wesjd.recursiveitems.RecursiveItems;
+import net.wesjd.recursiveitems.gui.SellingInventory;
 import org.bukkit.entity.Player;
 
 /**
@@ -23,7 +24,7 @@ public class SellCommand extends AbstractCommand {
      */
     @Override
     public void onCmd(Player player, String[] args) {
-
+        new SellingInventory(main, player);
 
     }
 
