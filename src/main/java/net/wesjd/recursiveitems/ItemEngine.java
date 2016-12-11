@@ -11,7 +11,6 @@ import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
 
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
@@ -41,6 +40,9 @@ public class ItemEngine {
         initializeCache();
     }
 
+    /**
+     * Resets/creates the cache
+     */
     private void initializeCache() {
         itemWorth = CacheBuilder.newBuilder()
                 .expireAfterAccess(main.getConfig().getLong("cache.expire-time-seconds"), TimeUnit.SECONDS)
@@ -53,10 +55,10 @@ public class ItemEngine {
      *
      * @param stack The {@link ItemStack} to find the worth of
      * @return The item's worth
-     * @throws ExecutionException if any base items involved in the crafting of this item do not have a defined price
-     * @throws ExecutionException if the {@link LoadingCache} throws it
+     * @throws NoWorthException if any base items involved in the crafting of this item do not have a defined price
+     * @throws Exception if the {@link LoadingCache} throws it
      */
-    public double getWorth(ItemStack stack) throws ExecutionException {
+    public double getWorth(ItemStack stack) throws Exception {
         return itemWorth.get(stack) * stack.getAmount();
     }
 
@@ -65,15 +67,12 @@ public class ItemEngine {
      *
      * @param stacks The {@link ItemStack[]} to find the worth of
      * @return The item's worth or 0 if none of the items have a defined price
+     * @throws Exception if an item doesn't have a worth
      */
-    public double getWorth(ItemStack... stacks) {
-        return Arrays.stream(stacks).filter(Objects::nonNull).mapToDouble(s -> {
-            try {
-                return getWorth(s);
-            } catch (ExecutionException e) {
-                return 0; //no defined price
-            }
-        }).sum();
+    public double getWorth(ItemStack... stacks) throws Exception {
+        double total = 0;
+        for(ItemStack stack : stacks) total += getWorth(stack);
+        return total;
     }
 
     /**
@@ -90,12 +89,12 @@ public class ItemEngine {
      * Removes the worth of an {@link ItemStack}({@link Material} and data value)
      *
      * @param stack The {@link ItemStack} to remove the worth of
-     * @throws Exception if the {@link ItemStack} involved doesn't have a worth
+     * @throws NoWorthException if the {@link ItemStack} involved doesn't have a worth
      */
-    public void removeWorth(ItemStack stack) throws Exception {
+    public void removeWorth(ItemStack stack) throws NoWorthException {
         if (main.getConfig().contains("defined." + stack.getType()))
             main.getConfig().set("defined." + stack.getType(), null);
-        else throw new Exception("No explicit worth set for ItemStack");
+        else throw new NoWorthException();
     }
 
     /**
@@ -142,7 +141,7 @@ public class ItemEngine {
                     .filter(recipe -> recipe instanceof ShapelessRecipe || recipe instanceof ShapedRecipe)
                     .sorted((recipe1, recipe2) -> -Integer.compare(recipe1.getResult().getAmount(), recipe2.getResult().getAmount()))
                     .findFirst();
-            if (possibleRecipe.isPresent()) { //
+            if (possibleRecipe.isPresent()) {
                 final Recipe recipe = possibleRecipe.get();
 
                 Collection<ItemStack> items = Collections.emptyList();
@@ -151,18 +150,35 @@ public class ItemEngine {
 
                 final Exception[] toThrow = new Exception[1];
                 final double worth = items.stream()
-                        .mapToDouble(item -> configWorth.apply(item).orElseGet(() -> {
+                        .filter(Objects::nonNull)
+                        .mapToDouble(item -> {
                             try {
-                                return load(item);
+                                return configWorth.apply(item).orElse(getWorth(item));
                             } catch (Exception ex) {
                                 toThrow[0] = ex;
                                 return -Double.MAX_VALUE;
                             }
-                        }))
+                        })
                         .sum();
                 if (toThrow[0] != null) throw toThrow[0];
                 return worth / recipe.getResult().getAmount();
-            } else throw new Exception("Item does not have a recipe or defined worth.");
+            } else throw new NoWorthException();
+        }
+
+    }
+
+    /**
+     * Represents when an item doesn't have a defined worth
+     *
+     * @author Wesley Smith
+     */
+    public static class NoWorthException extends Exception {
+
+        /**
+         * Creates an NoWorthException with the default message
+         */
+        public NoWorthException() {
+            super("Item does not have a recipe or defined worth");
         }
 
     }
