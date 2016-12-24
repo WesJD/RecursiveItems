@@ -9,6 +9,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.map.MapFont;
 
+import java.util.concurrent.ExecutionException;
+
 /**
  * An AbstractCommand for abstract people
  *
@@ -55,9 +57,12 @@ public abstract class AbstractCommand implements CommandExecutor {
             if (permission == null || player.hasPermission(permission)) {
                 try {
                     onCmd(player, args);
-                } catch (ItemEngine.NoWorthException ex) {
-                    ex.printStackTrace();
-                    player.sendMessage(ChatColor.RED + ex.getMessage());
+                } catch (ExecutionException ex) {
+                    if(ex.getCause() instanceof ItemEngine.NoWorthException) player.sendMessage(ChatColor.RED + ex.getCause().getMessage());
+                    else {
+                        ex.printStackTrace();
+                        player.sendMessage(ChatColor.RED + ex.getClass().getSimpleName() + ": " + ex.getMessage() + ".");
+                    }
                 } catch (Exception ex) {
                     ex.printStackTrace();
                     player.sendMessage(ChatColor.RED + ex.getClass().getSimpleName() + ": " + ex.getMessage() + ".");

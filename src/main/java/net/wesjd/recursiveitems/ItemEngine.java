@@ -196,7 +196,7 @@ public class ItemEngine {
          * Creates an NoWorthException with the default message
          */
         public NoWorthException() {
-            super("Item does not have a recipe or defined worth");
+            super("Item does not have a recipe or defined worth!");
         }
 
     }
