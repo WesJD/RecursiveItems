@@ -10,7 +10,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
-import org.bukkit.scoreboard.Team;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -77,6 +76,16 @@ public class ItemEngine {
     }
 
     /**
+     * Set the default worth of an {@link ItemStack}
+     *
+     * @param stack The {@link ItemStack} to set the default worth of
+     * @param value The default worth of the item
+     */
+    public void setDefaultWorth(ItemStack stack, double value) {
+        main.getConfig().set("defined." + stack.getType() + ".default", value);
+    }
+
+    /**
      * Set the worth of an {@link ItemStack}({@link Material} and data value)
      *
      * @param stack The {@link ItemStack} to set the worth of
@@ -84,6 +93,18 @@ public class ItemEngine {
      */
     public void setWorth(ItemStack stack, double value) {
         main.getConfig().set("defined." + stack.getType() + "." + stack.getDurability(), value);
+    }
+
+    /**
+     * Removes the default worth of an {@link ItemStack}
+     *
+     * @param stack The {@link ItemStack} to remove the default worth of
+     * @throws NoWorthException if the {@link ItemStack} involved doesn't have a worth
+     */
+    public void removeDefaultWorth(ItemStack stack) throws NoWorthException {
+        if (main.getConfig().contains("defined." + stack.getType() + ".default"))
+            main.getConfig().set("defined." + stack.getType() + ".default", null);
+        else throw new NoWorthException();
     }
 
     /**
@@ -162,8 +183,10 @@ public class ItemEngine {
          * @return A possible value
          */
         private OptionalDouble getConfigWorth(ItemStack stack) {
-            if(DEFINED_SECTION.contains(stack.getType().toString() + "." + stack.getDurability()))
-                return OptionalDouble.of(DEFINED_SECTION.getDouble(stack.getType() + "." + stack.getDurability()));
+            final ConfigurationSection typeSection = DEFINED_SECTION.getConfigurationSection(stack.getType().toString());
+            if(typeSection == null) return OptionalDouble.empty();
+            else if(typeSection.contains(Short.toString(stack.getDurability()))) return OptionalDouble.of(typeSection.getDouble(Short.toString(stack.getDurability())));
+            else if(typeSection.contains("default")) return OptionalDouble.of(typeSection.getDouble("default"));
             else return OptionalDouble.empty();
         }
 

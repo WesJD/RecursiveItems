@@ -30,7 +30,7 @@ public class RemoveWorthCommand extends AbstractCommand {
             final ItemStack hand = player.getItemInHand();
             if (hand != null) toWorth = hand;
             else {
-                player.sendMessage(ChatColor.RED + "Usage: /removeworth <material[:dataValue]>");
+                player.sendMessage(ChatColor.RED + "Usage: /removeworth [default] [material[:dataValue]]");
                 return;
             }
         } else if (args.length < 2) {
