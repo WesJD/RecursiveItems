@@ -5,14 +5,15 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
+import org.bukkit.scoreboard.Team;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 
 /**
  * The Item Engine, where almost everything is handled
@@ -71,7 +72,7 @@ public class ItemEngine {
      */
     public double getWorth(ItemStack... stacks) throws Exception {
         double total = 0;
-        for(ItemStack stack : stacks) total += getWorth(stack);
+        for(ItemStack stack : stacks) if(stack != null) total += getWorth(stack);
         return total;
     }
 
@@ -121,20 +122,16 @@ public class ItemEngine {
     private class WorthCacheLoader extends CacheLoader<ItemStack, Double> {
 
         /**
-         * Returns an {@link OptionalDouble} of the config's set worth value
+         * The "defined" path {@link ConfigurationSection}
          */
-        private final Function<ItemStack, OptionalDouble> configWorth = (stack) -> {
-            if (main.getConfig().contains("defined." + stack.getType() + "." + stack.getDurability()))
-                return OptionalDouble.of(main.getConfig().getDouble("defined." + stack.getType() + "." + stack.getDurability()));
-            return OptionalDouble.empty();
-        };
+        private final ConfigurationSection DEFINED_SECTION = main.getConfig().getConfigurationSection("defined");
 
         /**
          * @inheritDoc
          */
         @Override
         public Double load(ItemStack key) throws Exception {
-            final OptionalDouble possibleWorth = configWorth.apply(key); //check for a defined worth
+            final OptionalDouble possibleWorth = getConfigWorth(key); //check for a defined worth
             if (possibleWorth.isPresent()) return possibleWorth.getAsDouble();
 
             final Optional<Recipe> possibleRecipe = Bukkit.getRecipesFor(key).stream()
@@ -148,21 +145,42 @@ public class ItemEngine {
                 if (recipe instanceof ShapedRecipe) items = ((ShapedRecipe) recipe).getIngredientMap().values();
                 else if (recipe instanceof ShapelessRecipe) items = ((ShapelessRecipe) recipe).getIngredientList();
 
-                final Exception[] toThrow = new Exception[1];
-                final double worth = items.stream()
-                        .filter(Objects::nonNull)
-                        .mapToDouble(item -> {
-                            try {
-                                return configWorth.apply(item).orElse(getWorth(item));
-                            } catch (Exception ex) {
-                                toThrow[0] = ex;
-                                return -Double.MAX_VALUE;
-                            }
-                        })
-                        .sum();
-                if (toThrow[0] != null) throw toThrow[0];
+                double worth = 0;
+                for(ItemStack item : items) if(item != null && item.getType() != Material.AIR) {
+                    if(item.getDurability() == 32767) //if the recipe item can be of any type
+                        item.setDurability(findLowestWorthOfDurability(item).orElse((short) 32767));
+                    worth += getWorth(item);
+                }
                 return worth / recipe.getResult().getAmount();
             } else throw new NoWorthException();
+        }
+
+        /**
+         * Gets the worth of an item from the config if it exists
+         *
+         * @param stack The {@link ItemStack} to find the worth of
+         * @return A possible value
+         */
+        private OptionalDouble getConfigWorth(ItemStack stack) {
+            if(DEFINED_SECTION.contains(stack.getType().toString() + "." + stack.getDurability()))
+                return OptionalDouble.of(DEFINED_SECTION.getDouble(stack.getType() + "." + stack.getDurability()));
+            else return OptionalDouble.empty();
+        }
+
+        /**
+         * Finds the lowest worth value for the item type's durability
+         *
+         * @param stack The {@link ItemStack} to check from
+         * @return A possible value
+         */
+        private Optional<Short> findLowestWorthOfDurability(ItemStack stack) {
+            final ConfigurationSection typeSection = DEFINED_SECTION.getConfigurationSection(stack.getType().toString());
+            if(typeSection == null) return Optional.empty();
+            else return typeSection.getKeys(false)
+                    .stream()
+                    .sorted((check1, check2) -> -Integer.compare(typeSection.getInt(check1), typeSection.getInt(check2)))
+                    .map(Short::valueOf)
+                    .findFirst();
         }
 
     }
