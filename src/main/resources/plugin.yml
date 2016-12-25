@@ -2,7 +2,7 @@ name: RecursiveItems
 version: ${project.version}
 main: net.wesjd.recursiveitems.RecursiveItems
 depend: [Vault]
-authors: [WesJD, TheMrGong ]
+authors: [WesJD, TheMrGong]
 commands:
   sell:
     command: /<command>

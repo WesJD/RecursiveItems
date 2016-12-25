@@ -2,7 +2,6 @@ package net.wesjd.recursiveitems.gui;
 
 import net.wesjd.recursiveitems.RecursiveItems;
 import net.wesjd.recursiveitems.util.ItemBuilder;
-import net.wesjd.recursiveitems.util.ParsingUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -19,7 +18,10 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Inventory to allow players to easily sell a large quantity of items
@@ -89,6 +91,7 @@ public class SellingInventory implements Listener {
         this.player = player.getUniqueId();
 
         try {
+            register();
             initializeTopRow();
             player.openInventory(inventory);
         } catch (Exception ex) {

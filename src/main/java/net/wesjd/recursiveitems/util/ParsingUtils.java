@@ -14,9 +14,9 @@ import java.util.regex.Pattern;
 public class ParsingUtils {
 
     /**
-     * The stack regex pattern of "<(\w+)|(\d{1,2})>", used in {@link ParsingUtils#getStackFromArg(String)}
+     * The stack regex pattern of "(\w+)(?::(\d{1,2}))?", used in {@link ParsingUtils#getStackFromArg(String)}
      */
-    private static final Pattern STACK_PATTERN = Pattern.compile("<(\\w+)|(\\d{1,2})>");
+    private static final Pattern STACK_PATTERN = Pattern.compile("(\\w+)(?::(\\d{1,2}))?");
 
     /**
      * Creates an {@link ItemStack} from the command argument supplied
@@ -27,11 +27,7 @@ public class ParsingUtils {
      * @throws ArgumentParseException if argument doesn't match the format
      */
     public static ItemStack getStackFromArg(String arg) throws Exception {
-        final String[] parts = arg.split(":");
-        if(parts.length == 0 || parts.length <= 2) throw new ArgumentParseException();
-        final String argument = parts[0] + ":" + (parts.length > 1 ? parts[1] : 0);
-
-        final Matcher matcher = STACK_PATTERN.matcher(argument);
+        final Matcher matcher = STACK_PATTERN.matcher(arg);
         if(matcher.matches()) {
             final Material material;
             try {
@@ -39,7 +35,7 @@ public class ParsingUtils {
             } catch (Exception ex) {
                 throw new ArgumentParseException("Unable to parse material of \"" + matcher.group(1) + "\".");
             }
-            return new ItemStack(material, 1, Short.parseShort(matcher.group(2)));
+            return new ItemStack(material, 1, matcher.group(2) != null ? Short.parseShort(matcher.group(2)) : 0);
         } else throw new ArgumentParseException();
     }
 
