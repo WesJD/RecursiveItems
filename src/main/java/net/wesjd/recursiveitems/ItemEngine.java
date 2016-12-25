@@ -11,7 +11,10 @@ import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -56,7 +59,7 @@ public class ItemEngine {
      * @param stack The {@link ItemStack} to find the worth of
      * @return The item's worth
      * @throws NoWorthException if any base items involved in the crafting of this item do not have a defined price
-     * @throws Exception if the {@link LoadingCache} throws it
+     * @throws Exception        if the {@link LoadingCache} throws it
      */
     public double getWorth(ItemStack stack) throws Exception {
         return itemWorth.get(stack) * stack.getAmount();
@@ -71,7 +74,7 @@ public class ItemEngine {
      */
     public double getWorth(ItemStack... stacks) throws Exception {
         double total = 0;
-        for(ItemStack stack : stacks) if(stack != null) total += getWorth(stack);
+        for (ItemStack stack : stacks) if (stack != null) total += getWorth(stack);
         return total;
     }
 
@@ -114,8 +117,8 @@ public class ItemEngine {
      * @throws NoWorthException if the {@link ItemStack} involved doesn't have a worth
      */
     public void removeWorth(ItemStack stack) throws NoWorthException {
-        if (main.getConfig().contains("defined." + stack.getType()))
-            main.getConfig().set("defined." + stack.getType(), null);
+        if (main.getConfig().contains("defined." + stack.getType() + "." + stack.getDurability()))
+            main.getConfig().set("defined." + stack.getType() + "." + stack.getDurability(), null);
         else throw new NoWorthException();
     }
 
@@ -167,11 +170,12 @@ public class ItemEngine {
                 else if (recipe instanceof ShapelessRecipe) items = ((ShapelessRecipe) recipe).getIngredientList();
 
                 double worth = 0;
-                for(ItemStack item : items) if(item != null && item.getType() != Material.AIR) {
-                    if(item.getDurability() == 32767) //if the recipe item can be of any type
-                        item.setDurability(findLowestWorthOfDurability(item).orElse((short) 32767));
-                    worth += getWorth(item);
-                }
+                for (ItemStack item : items)
+                    if (item != null && item.getType() != Material.AIR) {
+                        if (item.getDurability() == 32767) //if the recipe item can be of any type
+                            item.setDurability(findLowestWorthOfDurability(item).orElse((short) 32767));
+                        worth += getWorth(item);
+                    }
                 return worth / recipe.getResult().getAmount();
             } else throw new NoWorthException();
         }
@@ -184,9 +188,10 @@ public class ItemEngine {
          */
         private OptionalDouble getConfigWorth(ItemStack stack) {
             final ConfigurationSection typeSection = DEFINED_SECTION.getConfigurationSection(stack.getType().toString());
-            if(typeSection == null) return OptionalDouble.empty();
-            else if(typeSection.contains(Short.toString(stack.getDurability()))) return OptionalDouble.of(typeSection.getDouble(Short.toString(stack.getDurability())));
-            else if(typeSection.contains("default")) return OptionalDouble.of(typeSection.getDouble("default"));
+            if (typeSection == null) return OptionalDouble.empty();
+            else if (typeSection.contains(Short.toString(stack.getDurability())))
+                return OptionalDouble.of(typeSection.getDouble(Short.toString(stack.getDurability())));
+            else if (typeSection.contains("default")) return OptionalDouble.of(typeSection.getDouble("default"));
             else return OptionalDouble.empty();
         }
 
@@ -198,7 +203,7 @@ public class ItemEngine {
          */
         private Optional<Short> findLowestWorthOfDurability(ItemStack stack) {
             final ConfigurationSection typeSection = DEFINED_SECTION.getConfigurationSection(stack.getType().toString());
-            if(typeSection == null) return Optional.empty();
+            if (typeSection == null) return Optional.empty();
             else return typeSection.getKeys(false)
                     .stream()
                     .sorted((check1, check2) -> -Integer.compare(typeSection.getInt(check1), typeSection.getInt(check2)))

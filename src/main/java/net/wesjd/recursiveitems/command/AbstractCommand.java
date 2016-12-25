@@ -7,7 +7,6 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.map.MapFont;
 
 import java.util.concurrent.ExecutionException;
 
@@ -61,11 +60,11 @@ public abstract class AbstractCommand implements CommandExecutor {
                     if(ex.getCause() instanceof ItemEngine.NoWorthException) player.sendMessage(ChatColor.RED + ex.getCause().getMessage());
                     else {
                         ex.printStackTrace();
-                        player.sendMessage(ChatColor.RED + ex.getClass().getSimpleName() + ": " + ex.getMessage() + ".");
+                        player.sendMessage(ChatColor.RED + ex.getClass().getSimpleName() + ": " + ex.getMessage());
                     }
                 } catch (Exception ex) {
                     ex.printStackTrace();
-                    player.sendMessage(ChatColor.RED + ex.getClass().getSimpleName() + ": " + ex.getMessage() + ".");
+                    player.sendMessage(ChatColor.RED + ex.getClass().getSimpleName() + ": " + ex.getMessage());
                 }
             } else player.sendMessage(ChatColor.RED + "You need the permission " + permission + " to execute this command!");
         } else sender.sendMessage(ChatColor.RED + "Only players can execute this command!");
