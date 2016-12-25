@@ -2,6 +2,7 @@ package net.wesjd.recursiveitems.gui;
 
 import net.wesjd.recursiveitems.RecursiveItems;
 import net.wesjd.recursiveitems.util.ItemBuilder;
+import net.wesjd.recursiveitems.util.ParsingUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -30,7 +31,10 @@ public class SellingInventory implements Listener {
     /**
      * Indexes for items and constant inventory size
      */
-    private static final int INVENTORY_SIZE = 54, SELL_AGREE_INDEX = 1, SELL_DISPLAY_INDEX = 4, SELL_CANCEL_INDEX = 7,
+    private static final int INVENTORY_SIZE = 54,
+            SELL_AGREE_INDEX = 1,
+            SELL_DISPLAY_INDEX = 4,
+            SELL_CANCEL_INDEX = 7,
             NO_ITEMS_INDEX = 22;
 
     /**
@@ -84,10 +88,13 @@ public class SellingInventory implements Listener {
         this.stored = new ItemStack[INVENTORY_SIZE - 9];
         this.player = player.getUniqueId();
 
-        register();
-        initializeInventory();
-
-        player.openInventory(inventory);
+        try {
+            initializeTopRow();
+            player.openInventory(inventory);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            player.sendMessage(ChatColor.RED + "There was an error while processing your request.");
+        }
     }
 
     /**
@@ -115,9 +122,15 @@ public class SellingInventory implements Listener {
      */
     private void handleSell() {
         getPlayer().ifPresent(p -> {
-            main.getEconomy().depositPlayer(p, main.getEngine().getWorth(stored)); //give the player their money
+            try {
+                main.getEconomy().depositPlayer(p, main.getEngine().getWorth(stored)); //give the player their money
 
-            for (int i = 0; i < stored.length; i++) stored[i] = null; //prevent duplication in rare cases
+                for (int i = 0; i < stored.length; i++) stored[i] = null; //prevent duplication in rare cases
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                p.closeInventory();
+                p.sendMessage(ChatColor.RED + "There was an error while processing your request.");
+            }
         });
     }
 
@@ -131,10 +144,10 @@ public class SellingInventory implements Listener {
     /**
      * Initializes top row which is never modified after
      * initialization. Contains useful buttons for the player
-     * <br />
-     * Also places an 'empty inventory' button
+     *
+     * @throws Exception if an exeception was thrown
      */
-    private void initializeInventory() {
+    private void initializeTopRow() throws Exception {
         for (int i = 0; i < 9; i++) {
             switch (i) {
                 case SELL_AGREE_INDEX:
@@ -157,14 +170,12 @@ public class SellingInventory implements Listener {
     /**
      * Generates and sets the {@link SellingInventory#SELL_DISPLAY_INDEX}
      * to an updated icon
-     * <br />
+     *
      * Called whenever inventory initialized or inventory re-rendered
+     * @throws Exception if an exception was thrown
      */
-    private void updateSellIcon() {
-        ItemStack w = generateSellIcon();
-        inventory.setItem(SELL_DISPLAY_INDEX, w);
-        System
-                
+    private void updateSellIcon() throws Exception {
+        inventory.setItem(SELL_DISPLAY_INDEX, generateSellIcon());
     }
 
     /**
@@ -173,11 +184,10 @@ public class SellingInventory implements Listener {
      * sold are worth
      *
      * @return {@link ItemStack} generated
+     * @throws Exception if an exception was thrown
      */
-    private ItemStack generateSellIcon() {
-        double worth = main.getEngine().getWorth(stored);
-        System.out.println("GOT WORTH: "+worth);
-        return new ItemBuilder(Material.PAPER).name(String.format(SELL_DISPLAY_FORMAT, worth)).build();
+    private ItemStack generateSellIcon() throws Exception {
+        return new ItemBuilder(Material.PAPER).name(String.format(SELL_DISPLAY_FORMAT, main.getEngine().getWorth(stored))).build();
     }
 
     /**
@@ -186,17 +196,24 @@ public class SellingInventory implements Listener {
      * has not placed any items in the selling inventory
      */
     private void displayInventoryItems() {
-        resetInventory();
-        updateSellIcon(); //update due to possible inventory change
-        boolean hasRendered = false;
-        for (int i = 9; i < INVENTORY_SIZE; i++) {
-            ItemStack render = stored[i - 9]; //subtract nine since first row is 9, and stored items start at index 0
+        try {
+            resetInventory();
+            updateSellIcon(); //update due to possible inventory change
+            boolean hasRendered = false;
+            for (int i = 9; i <= INVENTORY_SIZE; i++) {
+                ItemStack render = stored[i - 9]; //subtract nine since first row is 9, and stored items start at index 0
 
-            inventory.setItem(i, render);
-
-            if (render != null) hasRendered = true;
+                inventory.setItem(i, render);
+                if (render != null) hasRendered = true;
+            }
+            if (!hasRendered) inventory.setItem(NO_ITEMS_INDEX, NO_ITEMS_YET); //no items are placed in inventory!
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            getPlayer().ifPresent(p -> {
+                p.closeInventory();
+                p.sendMessage(ChatColor.RED + "There was an error while processing your request.");
+            });
         }
-        if (!hasRendered) inventory.setItem(NO_ITEMS_INDEX, NO_ITEMS_YET); //no items are placed in inventory!
     }
 
     /**

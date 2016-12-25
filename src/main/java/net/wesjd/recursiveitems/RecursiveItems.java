@@ -30,6 +30,7 @@ public class RecursiveItems extends JavaPlugin {
     @Override
     public void onEnable() {
         if (setupEconomy()) {
+            saveDefaultConfig();
             engine = new ItemEngine(this);
             getCommand("sell").setExecutor(new SellCommand(this));
             getCommand("setworth").setExecutor(new SetWorthCommand(this));
@@ -62,7 +63,7 @@ public class RecursiveItems extends JavaPlugin {
     }
 
     /**
-     * Get the Economy instace
+     * Get the Economy instance
      *
      * @return The instance
      */

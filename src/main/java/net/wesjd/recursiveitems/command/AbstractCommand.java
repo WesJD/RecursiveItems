@@ -1,11 +1,15 @@
 package net.wesjd.recursiveitems.command;
 
+import net.wesjd.recursiveitems.ItemEngine;
 import net.wesjd.recursiveitems.RecursiveItems;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.map.MapFont;
+
+import java.util.concurrent.ExecutionException;
 
 /**
  * An AbstractCommand for abstract people
@@ -53,7 +57,14 @@ public abstract class AbstractCommand implements CommandExecutor {
             if (permission == null || player.hasPermission(permission)) {
                 try {
                     onCmd(player, args);
+                } catch (ExecutionException ex) {
+                    if(ex.getCause() instanceof ItemEngine.NoWorthException) player.sendMessage(ChatColor.RED + ex.getCause().getMessage());
+                    else {
+                        ex.printStackTrace();
+                        player.sendMessage(ChatColor.RED + ex.getClass().getSimpleName() + ": " + ex.getMessage() + ".");
+                    }
                 } catch (Exception ex) {
+                    ex.printStackTrace();
                     player.sendMessage(ChatColor.RED + ex.getClass().getSimpleName() + ": " + ex.getMessage() + ".");
                 }
             } else player.sendMessage(ChatColor.RED + "You need the permission " + permission + " to execute this command!");

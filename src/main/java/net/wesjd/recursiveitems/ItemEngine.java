@@ -5,15 +5,14 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
 
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 
 /**
  * The Item Engine, where almost everything is handled
@@ -41,6 +40,9 @@ public class ItemEngine {
         initializeCache();
     }
 
+    /**
+     * Resets/creates the cache
+     */
     private void initializeCache() {
         itemWorth = CacheBuilder.newBuilder()
                 .expireAfterAccess(main.getConfig().getLong("cache.expire-time-seconds"), TimeUnit.SECONDS)
@@ -53,10 +55,10 @@ public class ItemEngine {
      *
      * @param stack The {@link ItemStack} to find the worth of
      * @return The item's worth
-     * @throws ExecutionException if any base items involved in the crafting of this item do not have a defined price
-     * @throws ExecutionException if the {@link LoadingCache} throws it
+     * @throws NoWorthException if any base items involved in the crafting of this item do not have a defined price
+     * @throws Exception if the {@link LoadingCache} throws it
      */
-    public double getWorth(ItemStack stack) throws ExecutionException {
+    public double getWorth(ItemStack stack) throws Exception {
         return itemWorth.get(stack) * stack.getAmount();
     }
 
@@ -65,19 +67,22 @@ public class ItemEngine {
      *
      * @param stacks The {@link ItemStack[]} to find the worth of
      * @return The item's worth or 0 if none of the items have a defined price
+     * @throws Exception if an item doesn't have a worth
      */
-    public double getWorth(ItemStack... stacks) {
-        return Arrays.stream(stacks).filter(Objects::nonNull).mapToDouble(s -> {
+    public double getWorth(ItemStack... stacks) throws Exception {
+        double total = 0;
+        for(ItemStack stack : stacks) if(stack != null) total += getWorth(stack);
+        return total;
+    }
 
-            try {
-                double w = getWorth(s);
-                System.out.println("FOUND WORTH: "+w);
-                return w;
-            } catch (ExecutionException e) {
-                System.out.println("NO PRICE DEFINED");
-                return 0; //no defined price
-            }
-        }).sum();
+    /**
+     * Set the default worth of an {@link ItemStack}
+     *
+     * @param stack The {@link ItemStack} to set the default worth of
+     * @param value The default worth of the item
+     */
+    public void setDefaultWorth(ItemStack stack, double value) {
+        main.getConfig().set("defined." + stack.getType() + ".default", value);
     }
 
     /**
@@ -91,15 +96,27 @@ public class ItemEngine {
     }
 
     /**
+     * Removes the default worth of an {@link ItemStack}
+     *
+     * @param stack The {@link ItemStack} to remove the default worth of
+     * @throws NoWorthException if the {@link ItemStack} involved doesn't have a worth
+     */
+    public void removeDefaultWorth(ItemStack stack) throws NoWorthException {
+        if (main.getConfig().contains("defined." + stack.getType() + ".default"))
+            main.getConfig().set("defined." + stack.getType() + ".default", null);
+        else throw new NoWorthException();
+    }
+
+    /**
      * Removes the worth of an {@link ItemStack}({@link Material} and data value)
      *
      * @param stack The {@link ItemStack} to remove the worth of
-     * @throws Exception if the {@link ItemStack} involved doesn't have a worth
+     * @throws NoWorthException if the {@link ItemStack} involved doesn't have a worth
      */
-    public void removeWorth(ItemStack stack) throws Exception {
+    public void removeWorth(ItemStack stack) throws NoWorthException {
         if (main.getConfig().contains("defined." + stack.getType()))
             main.getConfig().set("defined." + stack.getType(), null);
-        else throw new Exception("No explicit worth set for ItemStack");
+        else throw new NoWorthException();
     }
 
     /**
@@ -126,47 +143,83 @@ public class ItemEngine {
     private class WorthCacheLoader extends CacheLoader<ItemStack, Double> {
 
         /**
-         * Returns an {@link OptionalDouble} of the config's set worth value
+         * The "defined" path {@link ConfigurationSection}
          */
-        private final Function<ItemStack, OptionalDouble> configWorth = (stack) -> {
-            if (main.getConfig().contains("defined." + stack.getType() + "." + stack.getDurability()))
-                return OptionalDouble.of(main.getConfig().getDouble("defined." + stack.getType() + "." + stack.getDurability()));
-            return OptionalDouble.empty();
-        };
+        private final ConfigurationSection DEFINED_SECTION = main.getConfig().getConfigurationSection("defined");
 
         /**
          * @inheritDoc
          */
         @Override
         public Double load(ItemStack key) throws Exception {
-            final OptionalDouble possibleWorth = configWorth.apply(key); //check for a defined worth
+            final OptionalDouble possibleWorth = getConfigWorth(key); //check for a defined worth
             if (possibleWorth.isPresent()) return possibleWorth.getAsDouble();
 
             final Optional<Recipe> possibleRecipe = Bukkit.getRecipesFor(key).stream()
                     .filter(recipe -> recipe instanceof ShapelessRecipe || recipe instanceof ShapedRecipe)
                     .sorted((recipe1, recipe2) -> -Integer.compare(recipe1.getResult().getAmount(), recipe2.getResult().getAmount()))
                     .findFirst();
-            if (possibleRecipe.isPresent()) { //
+            if (possibleRecipe.isPresent()) {
                 final Recipe recipe = possibleRecipe.get();
 
                 Collection<ItemStack> items = Collections.emptyList();
                 if (recipe instanceof ShapedRecipe) items = ((ShapedRecipe) recipe).getIngredientMap().values();
                 else if (recipe instanceof ShapelessRecipe) items = ((ShapelessRecipe) recipe).getIngredientList();
 
-                final Exception[] toThrow = new Exception[1];
-                final double worth = items.stream()
-                        .mapToDouble(item -> configWorth.apply(item).orElseGet(() -> {
-                            try {
-                                return load(item);
-                            } catch (Exception ex) {
-                                toThrow[0] = ex;
-                                return -Double.MAX_VALUE;
-                            }
-                        }))
-                        .sum();
-                if (toThrow[0] != null) throw toThrow[0];
+                double worth = 0;
+                for(ItemStack item : items) if(item != null && item.getType() != Material.AIR) {
+                    if(item.getDurability() == 32767) //if the recipe item can be of any type
+                        item.setDurability(findLowestWorthOfDurability(item).orElse((short) 32767));
+                    worth += getWorth(item);
+                }
                 return worth / recipe.getResult().getAmount();
-            } else throw new Exception("Item does not have a recipe or defined worth.");
+            } else throw new NoWorthException();
+        }
+
+        /**
+         * Gets the worth of an item from the config if it exists
+         *
+         * @param stack The {@link ItemStack} to find the worth of
+         * @return A possible value
+         */
+        private OptionalDouble getConfigWorth(ItemStack stack) {
+            final ConfigurationSection typeSection = DEFINED_SECTION.getConfigurationSection(stack.getType().toString());
+            if(typeSection == null) return OptionalDouble.empty();
+            else if(typeSection.contains(Short.toString(stack.getDurability()))) return OptionalDouble.of(typeSection.getDouble(Short.toString(stack.getDurability())));
+            else if(typeSection.contains("default")) return OptionalDouble.of(typeSection.getDouble("default"));
+            else return OptionalDouble.empty();
+        }
+
+        /**
+         * Finds the lowest worth value for the item type's durability
+         *
+         * @param stack The {@link ItemStack} to check from
+         * @return A possible value
+         */
+        private Optional<Short> findLowestWorthOfDurability(ItemStack stack) {
+            final ConfigurationSection typeSection = DEFINED_SECTION.getConfigurationSection(stack.getType().toString());
+            if(typeSection == null) return Optional.empty();
+            else return typeSection.getKeys(false)
+                    .stream()
+                    .sorted((check1, check2) -> -Integer.compare(typeSection.getInt(check1), typeSection.getInt(check2)))
+                    .map(Short::valueOf)
+                    .findFirst();
+        }
+
+    }
+
+    /**
+     * Represents when an item doesn't have a defined worth
+     *
+     * @author Wesley Smith
+     */
+    public static class NoWorthException extends Exception {
+
+        /**
+         * Creates an NoWorthException with the default message
+         */
+        public NoWorthException() {
+            super("Item does not have a recipe or defined worth!");
         }
 
     }
