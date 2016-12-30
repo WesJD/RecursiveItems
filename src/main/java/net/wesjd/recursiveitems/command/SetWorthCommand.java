@@ -50,6 +50,8 @@ public class SetWorthCommand extends AbstractCommand {
 
             if (toWorth == null || toWorth.getType() == Material.AIR) showUsage(player);
             else {
+                toWorth = toWorth.clone();
+                toWorth.setAmount(1);
                 final double worth = Double.parseDouble(args[stackIndex + 1]);
 
                 if (isDefault) super.main.getEngine().setDefaultWorth(toWorth, worth);
