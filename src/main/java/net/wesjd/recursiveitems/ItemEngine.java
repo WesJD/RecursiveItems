@@ -15,6 +15,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -103,11 +104,17 @@ public class ItemEngine {
      *
      * @param stack The {@link ItemStack} to check for
      * @return Weather the item has any worth
+     * @throws Exception if there is anything unexpected
      */
-    public boolean hasAnyWorth(ItemStack stack) {
-        final ConfigurationSection section = main.getConfig().getConfigurationSection("defined." + stack.getType() + "." + stack.getDurability());
-        if(section == null) return false;
-        else return section.getKeys(false).isEmpty();
+    public boolean hasAnyWorth(ItemStack stack) throws Exception {
+        try {
+            getWorth(stack);
+            return true;
+        } catch (ExecutionException ex) {
+            if (ex.getCause() instanceof NoWorthException)
+                return false;
+            else throw ex;
+        }
     }
 
     /**

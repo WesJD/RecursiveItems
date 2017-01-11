@@ -7,13 +7,11 @@ import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -126,8 +124,12 @@ public class SellingInventory implements Listener {
     private void handleSell() {
         getPlayer().ifPresent(p -> {
             try {
-                main.getEconomy().depositPlayer(p, main.getEngine().getWorth(stored)); //give the player their money
+                double worth = main.getEngine().getWorth(stored);
+
+                main.getEconomy().depositPlayer(p, worth); //give the player their money
                 for (int i = 0; i < stored.length; i++) stored[i] = null; //prevent duplication in rare cases
+                p.sendMessage(ChatColor.GREEN + "You sold your items for $" + worth);
+                p.closeInventory();
             } catch (Exception ex) {
                 ex.printStackTrace();
                 p.closeInventory();
@@ -172,8 +174,9 @@ public class SellingInventory implements Listener {
     /**
      * Generates and sets the {@link SellingInventory#SELL_DISPLAY_INDEX}
      * to an updated icon
-     *
+     * <p>
      * Called whenever inventory initialized or inventory re-rendered
+     *
      * @throws Exception if an exception was thrown
      */
     private void updateSellIcon() throws Exception {
@@ -202,8 +205,9 @@ public class SellingInventory implements Listener {
             resetInventory();
             updateSellIcon(); //update due to possible inventory change
             boolean hasRendered = false;
-            for (int i = 9; i <= INVENTORY_SIZE; i++) {
+            for (int i = 9; i < INVENTORY_SIZE; i++) {
                 ItemStack render = stored[i - 9]; //subtract nine since first row is 9, and stored items start at index 0
+
                 inventory.setItem(i, render);
                 if (render != null) hasRendered = true;
             }
@@ -235,7 +239,8 @@ public class SellingInventory implements Listener {
             for (int i = 0; i < stored.length; i++) {
                 ItemStack item = stored[i];
                 if (item == null || item.getType() == Material.AIR) return Optional.of(i); //found an available slot
-                else if (item.getAmount() < 64 && item.isSimilar(stack)) return Optional.of(i); //check if the two can be grouped together and can be added
+                else if (item.getAmount() < 64 && item.isSimilar(stack))
+                    return Optional.of(i); //check if the two can be grouped together and can be added
             }
         return Optional.empty(); //no space for item
     }
@@ -269,13 +274,15 @@ public class SellingInventory implements Listener {
      *
      * @param index Index of {@link ItemStack} in {@link SellingInventory#stored}
      */
-    private void removeItem(int index) {
+    private boolean removeItem(int index) {
         ItemStack addToPlayer = stored[index];
         if (addToPlayer != null) {//if we are actually removing an item
-            getPlayer().ifPresent(p -> giveOrDrop(p, addToPlayer)); //give them the item back
             stored[index] = null; //set item to null
+            getPlayer().ifPresent(p -> giveOrDrop(p, addToPlayer)); //give them the item back
             displayInventoryItems(); //re-render inventory
+            return true;
         }
+        return false;
 
     }
 
@@ -300,6 +307,30 @@ public class SellingInventory implements Listener {
         return Optional.ofNullable(Bukkit.getPlayer(player));
     }
 
+    private void handleAdding(InventoryInteractEvent e, int interactSlot, ItemStack interacting, Runnable reset) {
+        if (interactSlot > 8) { //make sure they aren't clicking space fillers
+            if (interacting != null) { //placing an item in
+                try {
+                    if (main.getEngine().hasAnyWorth(interacting)) {
+                        reset.run(); //remove item from player inventory
+                        addItem(interacting);
+                        displayInventoryItems(); //re-render inventory (manual due to recursion)
+                    } else {
+                        e.setCancelled(true);
+                        e.getWhoClicked().sendMessage(ChatColor.RED + "That item doesn't have a defined worth!");
+                    }
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    getPlayer().orElseThrow(() -> new RuntimeException("Expected player to be online"))
+                            .sendMessage(ChatColor.RED + "There was an error while processing your request.");
+                }
+            } else {
+                if (removeItem(interactSlot - 9)) //removing an item
+                    e.setCancelled(false);
+            }
+        }
+    }
+
     @EventHandler
     public void onInventoryClick(InventoryClickEvent e) {
         getPlayer().filter(p -> player.equals(e.getWhoClicked().getUniqueId())) //if our opener clicked
@@ -310,12 +341,13 @@ public class SellingInventory implements Listener {
                     int interactSlot = -1;
                     Runnable reset = null;
 
+
                     switch (e.getClick()) {
                         case LEFT:
                         case RIGHT:
-                            if(e.getRawSlot() < INVENTORY_SIZE) { //clicked an item into selling inventory
+                            if (e.getRawSlot() < INVENTORY_SIZE) { //clicked an item into selling inventory
                                 interactSlot = e.getRawSlot();
-                                if(e.getCursor() != null && e.getCursor().getType() != Material.AIR) { //adding a new item
+                                if (e.getCursor() != null && e.getCursor().getType() != Material.AIR) { //adding a new item
                                     interacting = e.getCursor();
                                     reset = () -> e.setCursor(new ItemStack(Material.AIR));
                                 }//else removing
@@ -323,11 +355,15 @@ public class SellingInventory implements Listener {
                             break;
                         case SHIFT_LEFT:
                         case SHIFT_RIGHT:
-                            if(e.getRawSlot() > INVENTORY_SIZE) { //shift clicking item from player inventory into our inventory
+                            if (e.getRawSlot() > INVENTORY_SIZE) { //shift clicking item from player inventory into our inventory
                                 interacting = e.getCurrentItem();
-                                interactSlot = 999;
-                                reset = () -> Bukkit.getScheduler().runTask(main, () -> //v subtract inventory size to get into player inventory, subtract player inventory size to get into hotbar
-                                        e.getWhoClicked().getInventory().setItem(e.getSlot(), new ItemStack(Material.AIR)));
+                                if (interacting.getType() == Material.AIR)
+                                    interacting = null;
+                                else {
+                                    interactSlot = 999;
+                                    reset = () -> Bukkit.getScheduler().runTask(main, () -> //v subtract inventory size to get into player inventory, subtract player inventory size to get into hotbar
+                                            e.getWhoClicked().getInventory().setItem(e.getSlot(), new ItemStack(Material.AIR)));
+                                }
                             } else interactSlot = e.getRawSlot();//taking item out
                             break;
                         case MIDDLE:
@@ -337,7 +373,7 @@ public class SellingInventory implements Listener {
                             break;
                         case NUMBER_KEY:
                             ItemStack moveToOrFrom = e.getCurrentItem();
-                            if(e.getRawSlot() < INVENTORY_SIZE) {
+                            if (e.getRawSlot() < INVENTORY_SIZE) {
                                 interactSlot = e.getRawSlot();
                                 if ((moveToOrFrom == null || moveToOrFrom.getType() == Material.AIR)) {//putting item from inventory
                                     interactSlot = e.getRawSlot();
@@ -348,7 +384,8 @@ public class SellingInventory implements Listener {
                             break;
                         case DROP:
                         case CONTROL_DROP:
-                            if(e.getRawSlot() >= INVENTORY_SIZE) e.setCancelled(false); //interacting with own inventory
+                            if (e.getRawSlot() >= INVENTORY_SIZE)
+                                e.setCancelled(false); //interacting with own inventory
                             break;
                     }
 
@@ -360,19 +397,7 @@ public class SellingInventory implements Listener {
                             handleCancel();
                             break;
                         default:
-                            if (interactSlot > 8) { //make sure they aren't clicking space fillers
-                                if (interacting != null) { //placing an item in
-                                    if(main.getEngine().hasAnyWorth(interacting)) {
-                                        reset.run(); //remove item from player inventory
-                                        addItem(interacting);
-                                        displayInventoryItems(); //re-render inventory (manual due to recursion)
-                                    } else {
-                                        e.setCancelled(true);
-                                        e.getWhoClicked().sendMessage(ChatColor.RED + "That item doesn't have a defined worth!");
-                                        return;
-                                    }
-                                } else removeItem(interactSlot - 9); //removing an item
-                            }
+                            handleAdding(e, interactSlot, interacting, reset);
                             break;
                     }
                 });
@@ -381,8 +406,35 @@ public class SellingInventory implements Listener {
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent e) {
         getPlayer().filter(p -> player.equals(e.getWhoClicked().getUniqueId())) //if our opener clicked
-                .filter(p -> e.getInventorySlots().stream().anyMatch(i -> i < INVENTORY_SIZE)) //and they clicked inside our inventory
-                .ifPresent(p -> e.setCancelled(true)); //dont handle dragging, cursor item too glitchy
+                .ifPresent(p -> {
+                    ItemStack addingStack = e.getOldCursor().clone();
+                    addingStack.setAmount(1); // if the amount is 0, item type set to air
+                    int[] extraSubtract = new int[1];
+
+                    e.getNewItems().forEach((index, stack) -> {
+                        if (index < INVENTORY_SIZE)
+                            addingStack.setAmount(addingStack.getAmount() + stack.getAmount()); //add to total
+                        else {
+                            p.getOpenInventory().setItem(index, stack);
+
+                            extraSubtract[0] += stack.getAmount(); //items were added to players inventory, subtract from cursor
+                        }
+                    });
+
+                    addingStack.setAmount(addingStack.getAmount() - 1); // fix for setting amount to 1
+
+
+                    if (addingStack.getType() != Material.AIR && addingStack.getAmount() > 0) {//if air/amount 0, no items were being added
+                        handleAdding(e, INVENTORY_SIZE - 1, addingStack, () -> {
+                            ItemStack cursor = e.getOldCursor().clone();
+                            cursor.setAmount(cursor.getAmount() - addingStack.getAmount() - extraSubtract[0]);
+
+                            Bukkit.getScheduler().runTask(main, () -> p.getOpenInventory().setCursor(cursor)); //change the cursor to correct value
+                            // has to be later, due to denying the event causing the value to be set to its original value
+                            e.setResult(Event.Result.DENY);
+                        });
+                    }
+                });
     }
 
     @EventHandler
