@@ -39,8 +39,20 @@ public class WorthCommand extends AbstractCommand {
             player.sendMessage(ChatColor.RED + "Too many arguments.");
             return;
         }
-        player.sendMessage(ChatColor.GREEN + "A " + toWorth.getType() + (toWorth.getDurability() > 0 ? ":" + toWorth.getDurability() : "") +
-                " is worth " + super.main.getEconomy().format(super.main.getEngine().getWorth(toWorth)) + ".");
+
+        final StringBuilder output = new StringBuilder()
+                .append(ChatColor.GREEN.toString())
+                .append(toWorth.getAmount())
+                .append(" ")
+                .append(toWorth.getType().toString());
+        if(toWorth.getDurability() > 0) output.append(":").append(toWorth.getDurability());
+        output.append(" is worth ").append(super.main.getEconomy().format(super.main.getEngine().getWorth(toWorth)));
+        if(toWorth.getAmount() > 1) {
+            final ItemStack singluar = toWorth.clone();
+            singluar.setAmount(1);
+            output.append(" (").append(super.main.getEconomy().format(super.main.getEngine().getWorth(singluar))).append(" each)");
+        }
+        player.sendMessage(output.append(".").toString());
     }
 
 }

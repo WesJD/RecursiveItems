@@ -127,7 +127,6 @@ public class SellingInventory implements Listener {
         getPlayer().ifPresent(p -> {
             try {
                 main.getEconomy().depositPlayer(p, main.getEngine().getWorth(stored)); //give the player their money
-
                 for (int i = 0; i < stored.length; i++) stored[i] = null; //prevent duplication in rare cases
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -205,7 +204,6 @@ public class SellingInventory implements Listener {
             boolean hasRendered = false;
             for (int i = 9; i <= INVENTORY_SIZE; i++) {
                 ItemStack render = stored[i - 9]; //subtract nine since first row is 9, and stored items start at index 0
-
                 inventory.setItem(i, render);
                 if (render != null) hasRendered = true;
             }
@@ -361,13 +359,18 @@ public class SellingInventory implements Listener {
                         case SELL_CANCEL_INDEX: //nope, nevermind
                             handleCancel();
                             break;
-
                         default:
                             if (interactSlot > 8) { //make sure they aren't clicking space fillers
                                 if (interacting != null) { //placing an item in
-                                    reset.run(); //remove item from player inventory
-                                    addItem(interacting);
-                                    displayInventoryItems(); //re-render inventory (manual due to recursion)
+                                    if(main.getEngine().hasAnyWorth(interacting)) {
+                                        reset.run(); //remove item from player inventory
+                                        addItem(interacting);
+                                        displayInventoryItems(); //re-render inventory (manual due to recursion)
+                                    } else {
+                                        e.setCancelled(true);
+                                        e.getWhoClicked().sendMessage(ChatColor.RED + "That item doesn't have a defined worth!");
+                                        return;
+                                    }
                                 } else removeItem(interactSlot - 9); //removing an item
                             }
                             break;

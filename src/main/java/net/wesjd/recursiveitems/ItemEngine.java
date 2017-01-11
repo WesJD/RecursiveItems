@@ -99,6 +99,18 @@ public class ItemEngine {
     }
 
     /**
+     * Check to see if any worth exists for an {@link ItemStack}
+     *
+     * @param stack The {@link ItemStack} to check for
+     * @return Weather the item has any worth
+     */
+    public boolean hasAnyWorth(ItemStack stack) {
+        final ConfigurationSection section = main.getConfig().getConfigurationSection("defined." + stack.getType() + "." + stack.getDurability());
+        if(section == null) return false;
+        else return section.getKeys(false).isEmpty();
+    }
+
+    /**
      * Removes the default worth of an {@link ItemStack}
      *
      * @param stack The {@link ItemStack} to remove the default worth of
