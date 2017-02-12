@@ -341,15 +341,15 @@ public class SellingInventory implements Listener {
                     int interactSlot = -1;
                     Runnable reset = null;
 
-
-                    switch (e.getClick()) {
+                    final ClickType clickType = e.getClick();
+                    switch (clickType) {
                         case LEFT:
                         case RIGHT:
                             if (e.getRawSlot() < INVENTORY_SIZE) { //clicked an item into selling inventory
                                 interactSlot = e.getRawSlot();
                                 if (e.getCursor() != null && e.getCursor().getType() != Material.AIR) { //adding a new item
-                                    interacting = e.getCursor();
-                                    reset = () -> e.setCursor(new ItemStack(Material.AIR));
+                                    interacting = (clickType == ClickType.RIGHT ? new ItemStack(e.getCursor().getType()) : e.getCursor());
+                                    reset = () -> e.setCursor(clickType == ClickType.RIGHT ? new ItemStack(e.getCursor().getType(), e.getCursor().getAmount()-1) : new ItemStack(Material.AIR));
                                 }//else removing
                             } else e.setCancelled(false); //interacting with own inventory
                             break;
